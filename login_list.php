@@ -9,6 +9,7 @@ $config = require __DIR__ . '/config/config.php';
 $database = new Database($config["database"]);
 
 $loginRepository = new LoginRepository($database->getConnection(), Login::class);
+
 $logins = $loginRepository->findAll();
 
 echo View::render('login_list', 'default', ["logins"=>$logins]);

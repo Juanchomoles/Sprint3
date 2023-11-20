@@ -16,7 +16,7 @@ class Login implements EntityInterface
         return $this->id;
     }
 
-    private function setId(int $id)
+    private function setId(int $id): void
     {
         $this->id = $id;
     }

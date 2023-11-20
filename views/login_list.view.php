@@ -8,7 +8,7 @@
                 <th>password</th>
 
                 <th>role</th>
-                <th colspan="1">operacions</th>
+                <th colspan="2">operacions</th>
             </tr>
             <?php foreach ($logins as $login): ?>
                 <tr>
@@ -18,7 +18,8 @@
                     </td>
                     <td><?= $login->getPassword() ?></td>
                     <td><?= $login->getRole() ?></td>
-                    <td><a href="/books/delete?id=<?= $login->getId();?>">esborrar</a></td>
+                    <td><a class="tablea" href="login_delete.php?id=<?= $login->getId();?>">Borrar</a></td>
+                    <td><a class="tablea" href="login_update.php?id=<?= $login->getId();?>">Editar</a></td>
                 </tr>
             <?php endforeach; ?>
         </table>

@@ -3,6 +3,7 @@
 <head>
     <title>Untitled page</title>
     <link href="/assets/global.css" rel="stylesheet"/>
+    <link href="/../../src/css/table.css" rel="stylesheet"/>
     <meta charset="utf-8" />
 </head>
 <body>
@@ -18,7 +19,7 @@
             </li>
 
             <li>
-                <a href="/login.php">Iniciar sessió</a>
+                <a href="/login_create.php">Iniciar sessió</a>
             </li>
             <li>
                 <a href="/logout.php">Tancar sessió</a>
