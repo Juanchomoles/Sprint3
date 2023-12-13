@@ -1,31 +1,61 @@
 <?php
-require __DIR__ . '/src/Core/View.php';
-require __DIR__ . '/src/Repository/LoginRepository.php';
-require __DIR__ . '/src/Core/Database.php';
-require __DIR__ . '/src/Entity/Login.php';
-$config = require __DIR__ . '/config/config.php';
+declare(strict_types=1);
+require_once __DIR__ . '/vendor/autoload.php';
 
-try {
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $database = new Database($config["database"]);
-        $logRep = new LoginRepository($database->getConnection(), Login::class);
+use App\Core\Database;
+use App\Entity\Login;
+use App\Repository\LoginRepository;
+use App\Validator\LoginValidator;
+use App\Helper\FlashMessage;
 
-        $username = $_POST['username'];
-        $password = $_POST['password'];
-        $login = new Login();
-        $login->setUsername($username);
-        $login->setPassword($password);
-        $login->setRole("admin");
+session_start();
 
+//No la restringixc a admins per a que puguen crearse nous logins
 
-        $logRep->create($login);
+$config = require_once __DIR__ . '/config/config.php';
 
-        header("Location: /login_list.php");
+$database = new Database($config["database"]);
+$loginRepository = new LoginRepository($database->getConnection(), Login::class);
+
+// Verificar si s'ha enviat el formulari de confirmació
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $errors = [];
+    $validator = new LoginValidator($config);
+
+    $newLoginArray = [
+        "id" => 0,
+        'username' => $_POST['username'],
+        'password' => password_hash($_POST['password'], PASSWORD_BCRYPT),
+        'role' => $_POST['role'],
+    ];
+
+    $newLogin = Login::fromArray($newLoginArray);
+    $errors = $validator->validate($newLogin);
+
+    if (empty($errors)) {
+        try {
+            $loginRepository->create($newLogin);
+
+            // Redirigir a login_list.php després de la creació exitosa
+            header("Location: /login_list.php");
+            exit;
+        } catch (Exception $exception) {
+            // Redirigir a la pàgina de creació amb missatge d'error
+            FlashMessage::set("message", "Error en insertar les dades del proveïdor: " . $exception->getMessage());
+            header('Location: login_create.php');
+            exit;
+        }
     } else {
-        throw new Exception("No se recibieron los datos");
+        // Redirigir a la pàgina de creació amb missatges d'error
+        $errorMessages = implode(', ', $errors);
+        FlashMessage::set("message", "Errors de validació: $errorMessages");
+        header('Location: login_create.php');
+        exit;
     }
+} else {
+    // Gestionar el cas en què el login no es trobat
+    FlashMessage::set("message", "Login no trobat");
+    header('Location: login_list.php');
+    exit;
 }
-catch(Exception $e){
-    throw new Exception("Error al crear usuario: " . $e->getMessage());
-}
-?>

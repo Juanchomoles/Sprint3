@@ -1,8 +1,9 @@
 <?php
-
 declare(strict_types=1);
 
-require __DIR__ . '/../Core/EntityInterface.php';
+namespace App\Entity;
+
+use App\Core\EntityInterface;
 
 class Login implements EntityInterface
 {
@@ -16,7 +17,7 @@ class Login implements EntityInterface
         return $this->id;
     }
 
-    private function setId(int $id): void
+    public function setId(int $id)
     {
         $this->id = $id;
     }

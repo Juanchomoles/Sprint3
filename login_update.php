@@ -1,23 +1,51 @@
 <?php
-require __DIR__ . '/src/Core/View.php';
-require __DIR__ . '/src/Repository/LoginRepository.php';
-require __DIR__ . '/src/Core/Database.php';
-require __DIR__ . '/src/Entity/Login.php';
-$config = require __DIR__ . '/config/config.php';
+declare(strict_types=1);
+require_once __DIR__ . '/vendor/autoload.php';
 
-try {
-    if (isset($_GET['id'])) {
-        $database = new Database($config["database"]);
-        $loginRepository = new LoginRepository($database->getConnection(), Login::class);
-        $login = $loginRepository->find($_GET['id']);
+use App\Core\Database;
+use App\Core\View;
+use App\Entity\Login;
+use App\Repository\LoginRepository;
+use App\Core\Security;
+use App\Helper\FlashMessage;
 
-        echo View::render('update', 'default', ["login" => [$login]]);
+session_start();
+
+$token = Security::getToken();
+Security::isToken($token);
+Security::isRoleAdministrator($token);
+
+$config = require_once __DIR__ . '/config/config.php';
+
+$database = new Database($config["database"]);
+$loginRepository = new LoginRepository($database->getConnection(), Login::class);
+
+// Obtindre l'ID del login des de la URL
+$idToUpdate = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+
+// Verificar si l'ID és vàlid abans d'intentar editar
+if ($idToUpdate !== false) {
+    // Obtindre el login per ID
+    try {
+        $loginToUpdate = $loginRepository->find($idToUpdate);
+    } catch (RecordNotFoundException $e) {
+        FlashMessage::set("message", $e->getMessage());
+        header('Location: login_list.php');
+        exit;
     }
-    else {
-        throw new Exception("No se recibieron los datos");
+
+    // Verificar si s'ha trobat el login abans de mostrar la vista de confirmació
+    if ($loginToUpdate !== null) {
+        echo View::render('login_update_confirmation', 'default', ["loginToUpdate" => $loginToUpdate]);
+    } else {
+        // Gestionar el cas en què el login no es troba
+        FlashMessage::set("message", "Login no trobat");
+        header('Location: login_list.php');
+        exit;
     }
-} catch (Exception $e) {
-    throw new Exception("Error de Actualizacion: " . $e->getMessage());
+} else {
+    // Gestionar el cas en què l'ID no és un enter vàlid
+    FlashMessage::set("message", "ID no vàlid");
+    header('Location: login_list.php');
+    exit;
 }
-
-?>

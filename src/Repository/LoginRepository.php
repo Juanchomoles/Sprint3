@@ -1,54 +1,115 @@
 <?php
+declare(strict_types=1);
 
-require __DIR__ . '/../Core/Repository.php';
+namespace App\Repository;
 
+use App\Core\EntityInterface;
+use App\Core\Repository;
+use App\Entity\Login;
+use App\Helper\FlashMessage;
+use PDO;
+use PDOException;
 
+/**
+ * La classe LoginRepository gestiona les operacions de persistència per a l'entitat Login.
+ *
+ * @author carest23
+ */
 class LoginRepository extends Repository
 {
 
     /**
-     * @inheritDoc
+     * Recupera un registre de la taula 'login' basat en un ID proporcionat.
+     *
+     * @param int $id L'ID del registre a recuperar.
+     * @return EntityInterface Un objecte que representa el registre de la taula 'login'.
+     * @author carest23
      */
     public function find(int $id): EntityInterface
     {
-        // TODO: Implement find() method.
         try {
-
-            //Se realiza la consulta
-            $pdoStatement = $this->pdo->prepare("SELECT * FROM login WHERE id = :id");
+            $pdoStatement = $this->pdo->prepare("SELECT * FROM login WHERE ID = :id");
             $pdoStatement->execute([':id' => $id]);
-            $loginRecord = $pdoStatement->fetch(PDO::FETCH_ASSOC);
 
-            //Captura la excepcion
+            // Comprovar si s'ha trobat un registre
+            $loginRecord = $pdoStatement->fetch(PDO::FETCH_ASSOC);
             if (!$loginRecord) {
-                throw new Exception("No se ha encontrado ningun registro con la id $id");
+                FlashMessage::set("message", "No s'ha trobat cap registre amb l'ID $id.");
+                header('Location: login.php');
+                exit;
             }
 
-            //Trasformar el Array devuelto en un Entidad
+            // Instanciar un objecte de la classe especificada
+            $loginObject = new $this->entityClassName;
+            return $loginObject->fromArray($loginRecord);
 
-            return Login::fromArray($loginRecord);
 
-        } catch (Exception $e) {
-            throw new Exception("Problemas en mostrar los datos: " . $e->getMessage());
+        } catch (PDOException $e) {
+            // Gestionar l'excepció i llançar una RuntimeException
+            FlashMessage::set("message", "Error en la consulta: " . $e->getMessage());
+            header('Location: login.php');
+            exit;
         }
     }
 
     /**
-     * @inheritDoc
+     * Recupera un registre de la taula 'login' basat en un username proporcionat.
+     *
+     * @param string $username L'username del registre a recuperar.
+     * @return EntityInterface Un objecte que representa el registre de la taula 'login'.
+     * @author carest23
+     */
+    public function findByUsername(string $username): EntityInterface
+    {
+        try {
+            $pdoStatement = $this->pdo->prepare("SELECT * FROM login WHERE username = :username");
+            $pdoStatement->execute([':username' => $username]);
+
+            // Comprovar si s'ha trobat un registre
+            $login = $pdoStatement->fetch(PDO::FETCH_ASSOC);
+            if (!$login) {
+                FlashMessage::set("message", "No s'ha trobat cap registre amb l'usuari: $username.");
+                header('Location: login.php');
+                exit;
+            }
+
+            // Instanciar un objecte de la classe especificada
+            $loginObject = new $this->entityClassName;
+            return $loginObject->fromArray($login);
+
+
+        } catch (PDOException $e) {
+            // Gestionar l'excepció i llançar una RuntimeException
+            FlashMessage::set("message", "Error en la consulta: " . $e->getMessage());
+            header('Location: login.php');
+            exit;
+        }
+    }
+
+
+    /**
+     * Recupera tots els registres de la taula 'login' de la base de dades.
+     *
+     * @return array Un array que conté objectes de la classe especificada pel atribut 'entityClassName'.
+     * Cada objecte és creat a partir de les dades dels registres de la base de dades.
+     * @author carest23
      */
     public function findAll(): array
     {
-        // TODO: Implement findAll() method.
+        // Preparar la consulta SQL per seleccionar tots els registres de la taula 'login'.
         $pdoStatement = $this->pdo->prepare("SELECT * FROM login");
+
+        // Executar la consulta SQL.
         $pdoStatement->execute();
-        // TODO: Implement FetchMode in PDO object
+
+        // Establir el mode de recuperació a associatiu.
         $pdoStatement->setFetchMode(PDO::FETCH_ASSOC);
 
-        // get all records from database
+        // Obtenir tots els registres de la base de dades.
         $loginRecords = $pdoStatement->fetchAll();
 
         $logins = [];
-        // transform records into objects
+        // Transformar els registres en objectes.
         foreach ($loginRecords as $loginRecord) {
             $logins[] = call_user_func_array([$this->entityClassName, "fromArray"], [$loginRecord]);
         }
@@ -56,69 +117,109 @@ class LoginRepository extends Repository
         return $logins;
     }
 
+
     /**
-     * @inheritDoc
+     * Insereix un nou registre a la base de dades utilitzant les dades proporcionades per l'entitat.
+     *
+     * @param EntityInterface $entity L'entitat que conté les dades per al nou registre.
+     * @return void
+     * @author carest23
      */
     public function create(EntityInterface $entity): void
     {
-        // TODO: Implement create() method.
         try {
-            if ($entity == null) {
-                throw new Exception("No existe la entidad");
-            }
-            $statementCreate = "INSERT INTO login(username, password, role) VALUES (:username, :password, :role)";
-            $pdoCreate = $this->pdo->prepare($statementCreate);
+            // Obtenir les dades de l'objecte de l'entitat
+            $data = Login::toArray($entity);
 
-            $pdoCreate->bindValue(':username', $entity->getusername());
-            $pdoCreate->bindValue(':password', $entity->getPassword());
-            $pdoCreate->bindValue(':role', $entity->getRole());
-            $pdoCreate->execute();
+            unset($data["id"]);
+
+            // Crear la consulta SQL utilitzant consultes preparades
+            $columns = implode(', ', array_keys($data));
+            $values = ':' . implode(', :', array_keys($data));
+
+            // Preparar la consulta SQL
+            $pdoStatement = $this->pdo->prepare("INSERT INTO login ($columns) VALUES ($values)");
+
+            // Executar la consulta amb els valors de l'entitat
+            $pdoStatement->execute($data);
+
+            $id = $this->pdo->lastInsertId();
+            $entity->setId((int)$id);
+
         } catch (PDOException $e) {
-            throw  new Exception("Error al crear la base de datos: " . $e->getMessage());
+            // Gestionar l'excepció i llançar una RuntimeException
+            FlashMessage::set("message", "Error al crear: " . $e->getMessage());
+            header('Location: login.php');
+            exit;
         }
     }
 
     /**
-     * @inheritDoc
+     * Elimina un registre de la base de dades utilitzant la clau primària proporcionada per l'entitat.
+     *
+     * @param EntityInterface $entity L'entitat que conté la clau primària per al registre a eliminar.
+     * @return void
+     * @author carest23
      */
     public function delete(EntityInterface $entity): void
     {
-        // TODO: Implement delete() method.
         try {
-            $pdoDelete = $this->pdo->prepare("DELETE FROM login WHERE id = :id");
+            // Obtenir l'ID de l'objecte de l'entitat
             $id = $entity->getId();
-            if ($id === null) {
-                throw new Exception("La id no es valida");
-            }
-            $pdoDelete->execute([':id' => $id]);
+
+            // Preparar la consulta SQL utilitzant consultes preparades
+            $pdoStatement = $this->pdo->prepare("DELETE FROM login WHERE id = :id");
+
+            // Executar la consulta amb el valor de l'ID
+            $pdoStatement->execute([':id' => $id]);
         } catch (PDOException $e) {
-            throw new Exception( "Problemas borrando los datos: " . $e->getMessage());
+            // Gestionar l'excepció i llançar una RuntimeException
+            FlashMessage::set("message", "Error al eliminar: " . $e->getMessage());
+            header('Location: login.php');
+            exit;
         }
     }
 
+
     /**
-     * @inheritDoc
+     * Actualitza un registre a la base de dades utilitzant les dades proporcionades per l'entitat.
+     *
+     * @param EntityInterface $entity L'entitat que conté les dades per al registre a actualitzar.
+     * @return void
+     * @author carest23
      */
     public function update(EntityInterface $entity): void
     {
-        // TODO: Implement update() method.
         try {
+            // Obtenir les dades de l'objecte de l'entitat
+            $data = Login::toArray($entity);
 
-            $pdoUpdate = $this->pdo->prepare("UPDATE login SET username = :username, password = :password, role = :role WHERE id = :id");
+            // Obtenir l'ID de l'objecte de l'entitat
             $id = $entity->getId();
 
-            $pdoUpdate->bindValue(':id', $id);
-            $pdoUpdate->bindValue(':username', $entity->getUsername());
-            $pdoUpdate->bindValue(':password', $entity->getPassword());
-            $pdoUpdate->bindValue(':role', $entity->getRole());
-
-            $pdoUpdate->execute();
-
-            if ($id === null) {
-                throw new Exception("No existe la id Proporcionada para actualizar la tabla");
+            // Crear la llista d'assignacions per a l'actualització
+            $updateAssignments = [];
+            foreach (array_keys($data) as $column) {
+                $updateAssignments[] = "$column = :$column";
             }
+            $updateSet = implode(', ', $updateAssignments);
+
+            // Preparar la consulta SQL utilitzant consultes preparades
+            $pdoStatement = $this->pdo->prepare("UPDATE login SET $updateSet WHERE id = :id");
+
+            // Assignar el valor de l'ID i els valors de l'entitat
+            $pdoStatement->bindValue(':id', $id, PDO::PARAM_INT);
+            foreach ($data as $column => $value) {
+                $pdoStatement->bindValue(":$column", $value);
+            }
+
+            // Executar la consulta
+            $pdoStatement->execute();
         } catch (PDOException $e) {
-            throw new Exception("Error al actualizar los datos: " . $e->getMessage());
+            // Gestionar l'excepció i llançar una RuntimeException
+            FlashMessage::set("message", "Error al actualitzar: " . $e->getMessage());
+            header('Location: login.php');
+            exit;
         }
     }
 }
